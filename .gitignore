@@ -127,3 +127,9 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# dataset directories
+Dataset/
+
+# Model binaries 
+*.pth
