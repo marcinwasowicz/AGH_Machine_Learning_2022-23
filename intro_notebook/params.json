@@ -1,0 +1,7 @@
+{
+  "train_teachers": false,
+  "temperature": 10,
+  "teacher_epochs": 20,
+  "student_epochs": 20,
+  "lr": 1e-3
+}
