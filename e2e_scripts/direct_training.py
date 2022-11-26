@@ -53,11 +53,15 @@ def checkpoint(model, model_save_path):
 
 
 def prepare_cifar10_dataset(train_val_split, batch_size):
-    train_data = CIFAR10(root="./Dataset", train=True, transform=transform(224))
+    train_data = CIFAR10(
+        root="./Dataset", download=True, train=True, transform=transform(224)
+    )
     train_data, val_data = random_split(
         train_data, train_val_split, generator=torch.Generator().manual_seed(42)
     )
-    test_data = CIFAR10(root="./Dataset", train=False, transform=transform(224))
+    test_data = CIFAR10(
+        root="./Dataset", download=True, train=False, transform=transform(224)
+    )
 
     train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_data, batch_size=batch_size, shuffle=False)
@@ -96,11 +100,10 @@ if __name__ == "__main__":
     best_accuracy = 0.0
     loss_function = torch.nn.CrossEntropyLoss()
 
-    if torch.cuda.is_available():
-        model = model.cuda()
-
     for epoch in range(epochs):
         model.train(True)
+        if torch.cuda.is_available():
+            model = model.cuda()
 
         current_loss = 0.0
         current_accuracy = 0.0
@@ -132,3 +135,5 @@ if __name__ == "__main__":
         if current_accuracy > best_accuracy:
             best_accuracy = current_accuracy
             checkpoint(model, model_save_path)
+
+    print(f"TestAccuracy: {evaluate(model, test_loader)}")
