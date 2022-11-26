@@ -8,7 +8,7 @@ from torchvision.datasets import CIFAR10
 from tqdm import tqdm
 
 sys.path.insert(0, ".")
-from models import ResNet18Classifier
+from models import ResNet18Classifier, ResNet18ScaledClassifier
 
 
 CIFAR10_TRAIN_VAL_SPLIT = [42000, 8000]
@@ -17,6 +17,7 @@ CIFAR10_MODEL_SAVE_PATH_PREFIX = "cifar10_direct_"
 CIFAR10_NUM_CLASSES = 10
 
 RESNET18_MODEL_SAVE_PATH_SUFFIX = "resnet18.pth"
+RESNET18_SC_MODEL_SAVE_PATH_SUFFIX = "resnet18_sc.pth"
 
 MODEL_SAVE_PATH_DIR = "./model_binaries/"
 
@@ -34,6 +35,10 @@ def transform(resize_shape):
 def evaluate(model, loader):
     correct = 0
     total = 0
+    model.train(False)
+
+    if torch.cuda.is_available():
+        model = model.cuda()
 
     with torch.no_grad():
         for inputs, labels in loader:
@@ -70,6 +75,46 @@ def prepare_cifar10_dataset(train_val_split, batch_size):
     return train_loader, val_loader, test_loader
 
 
+def training_loop(loss_function, model, epochs, train_loader, val_loader, test_loader):
+    best_accuracy = 0.0
+
+    for epoch in range(epochs):
+        model.train(True)
+        if torch.cuda.is_available():
+            model = model.cuda()
+
+        current_loss = 0.0
+        current_accuracy = 0.0
+        total_count = 0.0
+
+        for data in tqdm(train_loader, desc=f"Epoch: {epoch + 1}"):
+            inputs, labels = data
+            if torch.cuda.is_available():
+                inputs, labels = inputs.cuda(), labels.cuda()
+
+            optimizer.zero_grad()
+            outputs = model(inputs)
+            loss = loss_function(outputs, labels)
+            loss.backward()
+            optimizer.step()
+
+            current_loss += loss.item() * inputs.size(0)
+            out = torch.argmax(outputs.detach(), dim=1)
+            current_accuracy += (labels == out).sum().item()
+            total_count += len(labels)
+
+        print(
+            f"Train loss: {current_loss/len(train_loader)}, Train Acc: {current_accuracy*100/total_count}%"
+        )
+        current_accuracy = evaluate(model, val_loader)
+        print(f"Val accuracy:{current_accuracy*100}%")
+        if current_accuracy > best_accuracy:
+            best_accuracy = current_accuracy
+            checkpoint(model, model_save_path)
+
+    print(f"Test Accuracy: {evaluate(model, test_loader) * 100}%")
+
+
 if __name__ == "__main__":
     _script, model, dataset, epochs = sys.argv
     epochs = int(epochs)
@@ -91,49 +136,18 @@ if __name__ == "__main__":
             [
                 {"params": model.base.parameters(), "lr": 0.0001},
                 {"params": model.classification_layer.parameters(), "lr": 0.001},
-            ]
+            ],
+            weight_decay=1e-5,
         )
         model_save_path = f"{model_save_path_prefix}{RESNET18_MODEL_SAVE_PATH_SUFFIX}"
+    elif model == "resnet18_sc":
+        model = ResNet18ScaledClassifier(num_classes)
+        optimizer = torch.optim.Adam(model.parameters(), lr=0.0005, weight_decay=1e-5)
+        model_save_path = (
+            f"{model_save_path_prefix}{RESNET18_SC_MODEL_SAVE_PATH_SUFFIX}"
+        )
     else:
         raise Exception("Unsupported model: resnet18 allowed")
 
-    best_accuracy = 0.0
     loss_function = torch.nn.CrossEntropyLoss()
-
-    for epoch in range(epochs):
-        model.train(True)
-        if torch.cuda.is_available():
-            model = model.cuda()
-
-        current_loss = 0.0
-        current_accuracy = 0.0
-
-        for data in tqdm(train_loader, desc=f"Epoch: {epoch + 1}"):
-            inputs, labels = data
-
-            if torch.cuda.is_available():
-                inputs, labels = inputs.cuda(), labels.cuda()
-
-            optimizer.zero_grad()
-            outputs = model(inputs)
-            loss = loss_function(outputs, labels)
-            loss.backward()
-            optimizer.step()
-
-            current_loss += loss.item() * inputs.size(0)
-            out = torch.argmax(outputs.detach(), dim=1)
-            assert out.shape == labels.shape
-            current_accuracy += (labels == out).sum().item()
-
-        print(
-            f"Train loss: {current_loss/len(train_loader)}, Train Acc: {current_accuracy*100/len(train_loader)}%"
-        )
-
-        model.train(False)
-        current_accuracy = evaluate(model, val_loader)
-        print(f"Val accuracy:{current_accuracy*100}%")
-        if current_accuracy > best_accuracy:
-            best_accuracy = current_accuracy
-            checkpoint(model, model_save_path)
-
-    print(f"TestAccuracy: {evaluate(model, test_loader)}")
+    training_loop(loss_function, model, epochs, train_loader, val_loader, test_loader)
