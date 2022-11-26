@@ -1,5 +1,6 @@
 import sys
 
+import torch
 from tqdm import tqdm
 
 sys.path.insert(0, ".")
@@ -7,22 +8,28 @@ from models import ResNet18Classifier, ResNet18ScaledClassifier
 from utils import *
 
 
+KD_ALPHA = 0.9
+
+
 def training_loop(
     loss_function,
     optimizer,
-    model,
-    model_save_path,
+    student,
+    teacher,
+    student_save_path,
     epochs,
     train_loader,
     val_loader,
     test_loader,
 ):
+    if torch.cuda.is_available():
+        teacher.cuda()
     best_accuracy = 0.0
 
     for epoch in range(epochs):
-        model.train(True)
+        student.train(True)
         if torch.cuda.is_available():
-            model = model.cuda()
+            student = student.cuda()
 
         current_loss = 0.0
         current_accuracy = 0.0
@@ -33,9 +40,14 @@ def training_loop(
             if torch.cuda.is_available():
                 inputs, labels = inputs.cuda(), labels.cuda()
 
+            with torch.no_grad():
+                teacher_logits = teacher(inputs)
+
             optimizer.zero_grad()
-            outputs = model(inputs)
-            loss = loss_function(outputs, labels)
+            outputs = student(inputs)
+            loss = KD_ALPHA * loss_function(outputs, teacher_logits) + (
+                1 - KD_ALPHA
+            ) * loss_function(outputs, labels)
             loss.backward()
             optimizer.step()
 
@@ -47,55 +59,40 @@ def training_loop(
         print(
             f"Train loss: {current_loss/len(train_loader)}, Train Acc: {current_accuracy*100/total_count}%"
         )
-        current_accuracy = evaluate(model, val_loader)
+
+        current_accuracy = evaluate(student, val_loader)
         print(f"Val accuracy:{current_accuracy*100}%")
         if current_accuracy > best_accuracy:
             best_accuracy = current_accuracy
-            checkpoint(model, model_save_path)
+            checkpoint(student, student_save_path)
 
-    print(f"Test Accuracy: {evaluate(model, test_loader) * 100}%")
+    print(f"Test Accuracy: {evaluate(student, test_loader) * 100}%")
 
 
 if __name__ == "__main__":
-    _script, model, dataset, epochs = sys.argv
+    _script, dataset, epochs = sys.argv
     epochs = int(epochs)
-
     if dataset == "CIFAR10":
         train_loader, val_loader, test_loader = prepare_cifar10_dataset(
             CIFAR10_TRAIN_VAL_SPLIT, CIFAR10_BATCH_SIZE
         )
         num_classes = CIFAR10_NUM_CLASSES
-        model_save_path_prefix = (
-            f"{MODEL_SAVE_PATH_DIR}{CIFAR10_MODEL_SAVE_PATH_PREFIX}"
-        )
+        student_model_save_path = f"{MODEL_SAVE_PATH_DIR}{CIFAR10_MODEL_SAVE_PATH_PREFIX}{RESNET18_SC_MODEL_SAVE_PATH_SUFFIX}"
+        teacher_model_save_path = f"{MODEL_SAVE_PATH_DIR}{CIFAR10_MODEL_SAVE_PATH_PREFIX}{RESNET18_MODEL_SAVE_PATH_SUFFIX}"
     else:
         raise Exception("Unsupported dataset. Allowed: CIFAR10")
 
-    if model == "resnet18":
-        model = ResNet18Classifier(num_classes)
-        optimizer = torch.optim.Adam(
-            [
-                {"params": model.base.parameters(), "lr": 0.0001},
-                {"params": model.classification_layer.parameters(), "lr": 0.001},
-            ],
-            weight_decay=1e-5,
-        )
-        model_save_path = f"{model_save_path_prefix}{RESNET18_MODEL_SAVE_PATH_SUFFIX}"
-    elif model == "resnet18_sc":
-        model = ResNet18ScaledClassifier(num_classes)
-        optimizer = torch.optim.Adam(model.parameters(), lr=0.0005, weight_decay=1e-5)
-        model_save_path = (
-            f"{model_save_path_prefix}{RESNET18_SC_MODEL_SAVE_PATH_SUFFIX}"
-        )
-    else:
-        raise Exception("Unsupported model: resnet18 allowed")
+    student = ResNet18ScaledClassifier(num_classes)
+    teacher = ResNet18Classifier(num_classes)
+    # teacher.load_state_dict(torch.load(teacher_model_save_path))
 
-    loss_function = torch.nn.CrossEntropyLoss()
+    optimizer = torch.optim.Adam(student.parameters(), lr=0.0005, weight_decay=1e-5)
     training_loop(
-        loss_function,
+        torch.nn.CrossEntropyLoss(),
         optimizer,
-        model,
-        model_save_path,
+        student,
+        teacher,
+        student_model_save_path,
         epochs,
         train_loader,
         val_loader,
