@@ -1,6 +1,7 @@
 import sys
 
 import torch
+import torch.nn.functional as F
 from tqdm import tqdm
 
 sys.path.insert(0, ".")
@@ -8,7 +9,7 @@ from models import ResNet18Classifier, ResNet18ScaledClassifier
 from utils import *
 
 
-KD_ALPHA = 0.9
+SC_RESNET_KD_LR = 0.0005
 
 
 def training_loop(
@@ -41,13 +42,11 @@ def training_loop(
                 inputs, labels = inputs.cuda(), labels.cuda()
 
             with torch.no_grad():
-                teacher_logits = teacher(inputs)
+                teacher_logits = F.softmax(teacher(inputs), dim=1)
 
             optimizer.zero_grad()
-            outputs = student(inputs)
-            loss = KD_ALPHA * loss_function(outputs, teacher_logits) + (
-                1 - KD_ALPHA
-            ) * loss_function(outputs, labels)
+            outputs = F.softmax(student(inputs), dim=1)
+            loss = loss_function(outputs, teacher_logits)
             loss.backward()
             optimizer.step()
 
@@ -72,21 +71,32 @@ def training_loop(
 if __name__ == "__main__":
     _script, dataset, epochs = sys.argv
     epochs = int(epochs)
+
     if dataset == "CIFAR10":
         train_loader, val_loader, test_loader = prepare_cifar10_dataset(
             CIFAR10_TRAIN_VAL_SPLIT, CIFAR10_BATCH_SIZE
         )
         num_classes = CIFAR10_NUM_CLASSES
-        student_model_save_path = f"{MODEL_SAVE_PATH_DIR}{CIFAR10_MODEL_SAVE_PATH_PREFIX}{RESNET18_SC_MODEL_SAVE_PATH_SUFFIX}"
-        teacher_model_save_path = f"{MODEL_SAVE_PATH_DIR}{CIFAR10_MODEL_SAVE_PATH_PREFIX}{RESNET18_MODEL_SAVE_PATH_SUFFIX}"
+        student_model_save_path = "kd_{}{}{}".format(
+            MODEL_SAVE_PATH_DIR,
+            CIFAR10_MODEL_SAVE_PATH_PREFIX,
+            RESNET18_SC_MODEL_SAVE_PATH_SUFFIX,
+        )
+        teacher_model_save_path = "{}{}{}".format(
+            MODEL_SAVE_PATH_DIR,
+            CIFAR10_MODEL_SAVE_PATH_PREFIX,
+            RESNET18_MODEL_SAVE_PATH_SUFFIX,
+        )
     else:
         raise Exception("Unsupported dataset. Allowed: CIFAR10")
 
     student = ResNet18ScaledClassifier(num_classes)
     teacher = ResNet18Classifier(num_classes)
-    # teacher.load_state_dict(torch.load(teacher_model_save_path))
+    teacher.load_state_dict(torch.load(teacher_model_save_path))
 
-    optimizer = torch.optim.Adam(student.parameters(), lr=0.0005, weight_decay=1e-5)
+    optimizer = torch.optim.Adam(
+        student.parameters(), lr=SC_RESNET_KD_LR, weight_decay=1e-5
+    )
     training_loop(
         torch.nn.CrossEntropyLoss(),
         optimizer,

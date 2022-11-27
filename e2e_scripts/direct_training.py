@@ -4,7 +4,14 @@ from tqdm import tqdm
 
 sys.path.insert(0, ".")
 from models import ResNet18Classifier, ResNet18ScaledClassifier
+import torch.nn.functional as F
 from utils import *
+
+
+RESNET_BASE_LR = 0.0001
+RESNET_FC_LR = 0.001
+
+SC_RESNET_LR = 0.0005
 
 
 def training_loop(
@@ -34,7 +41,7 @@ def training_loop(
                 inputs, labels = inputs.cuda(), labels.cuda()
 
             optimizer.zero_grad()
-            outputs = model(inputs)
+            outputs = F.softmax(model(inputs), dim=1)
             loss = loss_function(outputs, labels)
             loss.backward()
             optimizer.step()
@@ -75,15 +82,17 @@ if __name__ == "__main__":
         model = ResNet18Classifier(num_classes)
         optimizer = torch.optim.Adam(
             [
-                {"params": model.base.parameters(), "lr": 0.0001},
-                {"params": model.classification_layer.parameters(), "lr": 0.001},
+                {"params": model.base.parameters(), "lr": RESNET_BASE_LR},
+                {"params": model.classification_layer.parameters(), "lr": RESNET_FC_LR},
             ],
             weight_decay=1e-5,
         )
         model_save_path = f"{model_save_path_prefix}{RESNET18_MODEL_SAVE_PATH_SUFFIX}"
     elif model == "resnet18_sc":
         model = ResNet18ScaledClassifier(num_classes)
-        optimizer = torch.optim.Adam(model.parameters(), lr=0.0005, weight_decay=1e-5)
+        optimizer = torch.optim.Adam(
+            model.parameters(), lr=SC_RESNET_LR, weight_decay=1e-5
+        )
         model_save_path = (
             f"{model_save_path_prefix}{RESNET18_SC_MODEL_SAVE_PATH_SUFFIX}"
         )
