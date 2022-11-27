@@ -42,10 +42,10 @@ def training_loop(
                 inputs, labels = inputs.cuda(), labels.cuda()
 
             with torch.no_grad():
-                teacher_logits = F.softmax(teacher(inputs), dim=1)
+                teacher_logits = teacher(inputs)
 
             optimizer.zero_grad()
-            outputs = F.softmax(student(inputs), dim=1)
+            outputs = student(inputs)
             loss = loss_function(outputs, teacher_logits)
             loss.backward()
             optimizer.step()
@@ -77,7 +77,7 @@ if __name__ == "__main__":
             CIFAR10_TRAIN_VAL_SPLIT, CIFAR10_BATCH_SIZE
         )
         num_classes = CIFAR10_NUM_CLASSES
-        student_model_save_path = "kd_{}{}{}".format(
+        student_model_save_path = "{}{}_kd_{}".format(
             MODEL_SAVE_PATH_DIR,
             CIFAR10_MODEL_SAVE_PATH_PREFIX,
             RESNET18_SC_MODEL_SAVE_PATH_SUFFIX,
@@ -98,7 +98,7 @@ if __name__ == "__main__":
         student.parameters(), lr=SC_RESNET_KD_LR, weight_decay=1e-5
     )
     training_loop(
-        torch.nn.CrossEntropyLoss(),
+        torch.nn.MSELoss(),
         optimizer,
         student,
         teacher,
