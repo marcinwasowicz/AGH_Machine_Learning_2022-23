@@ -74,6 +74,12 @@ if __name__ == "__main__":
         model_save_path_prefix = (
             f"{MODEL_SAVE_PATH_DIR}{CIFAR10_MODEL_SAVE_PATH_PREFIX}"
         )
+    elif dataset == "EMNIST":
+        train_loader, val_loader, test_loader = prepare_emnist_dataset(
+            EMNIST_TRAIN_VAL_SPLIT, EMNIST_BATCH_SIZE
+        )
+        num_classes = EMNIST_NUM_CLASSES
+        model_save_path_prefix = f"{MODEL_SAVE_PATH_DIR}{EMNIST_MODEL_SAVE_PATH_PREFIX}"
     else:
         raise Exception("Unsupported dataset. Allowed: CIFAR10")
 

@@ -76,7 +76,7 @@ if __name__ == "__main__":
             CIFAR10_TRAIN_VAL_SPLIT, CIFAR10_BATCH_SIZE
         )
         num_classes = CIFAR10_NUM_CLASSES
-        student_model_save_path = "{}{}_kd_{}".format(
+        student_model_save_path = "{}{}kd_{}".format(
             MODEL_SAVE_PATH_DIR,
             CIFAR10_MODEL_SAVE_PATH_PREFIX,
             RESNET18_SC_MODEL_SAVE_PATH_SUFFIX,
@@ -84,6 +84,21 @@ if __name__ == "__main__":
         teacher_model_save_path = "{}{}{}".format(
             MODEL_SAVE_PATH_DIR,
             CIFAR10_MODEL_SAVE_PATH_PREFIX,
+            RESNET18_MODEL_SAVE_PATH_SUFFIX,
+        )
+    elif dataset == "EMNIST":
+        train_loader, val_loader, test_loader = prepare_emnist_dataset(
+            EMNIST_TRAIN_VAL_SPLIT, EMNIST_BATCH_SIZE
+        )
+        num_classes = EMNIST_NUM_CLASSES
+        student_model_save_path = "{}{}kd_{}".format(
+            MODEL_SAVE_PATH_DIR,
+            EMNIST_MODEL_SAVE_PATH_PREFIX,
+            RESNET18_SC_MODEL_SAVE_PATH_SUFFIX,
+        )
+        teacher_model_save_path = "{}{}{}".format(
+            MODEL_SAVE_PATH_DIR,
+            EMNIST_MODEL_SAVE_PATH_PREFIX,
             RESNET18_MODEL_SAVE_PATH_SUFFIX,
         )
     else:
