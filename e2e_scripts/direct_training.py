@@ -4,7 +4,6 @@ from tqdm import tqdm
 
 sys.path.insert(0, ".")
 from models import ResNet18Classifier, ResNet18ScaledClassifier
-import torch.nn.functional as F
 from utils import *
 
 
@@ -41,12 +40,12 @@ def training_loop(
                 inputs, labels = inputs.cuda(), labels.cuda()
 
             optimizer.zero_grad()
-            outputs = F.softmax(model(inputs), dim=1)
+            outputs = model(inputs)
             loss = loss_function(outputs, labels)
             loss.backward()
             optimizer.step()
 
-            current_loss += loss.item() * inputs.size(0)
+            current_loss += loss.item()
             out = torch.argmax(outputs.detach(), dim=1)
             current_accuracy += (labels == out).sum().item()
             total_count += len(labels)

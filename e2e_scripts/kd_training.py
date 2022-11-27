@@ -1,7 +1,6 @@
 import sys
 
 import torch
-import torch.nn.functional as F
 from tqdm import tqdm
 
 sys.path.insert(0, ".")
@@ -50,7 +49,7 @@ def training_loop(
             loss.backward()
             optimizer.step()
 
-            current_loss += loss.item() * inputs.size(0)
+            current_loss += loss.item()
             out = torch.argmax(outputs.detach(), dim=1)
             current_accuracy += (labels == out).sum().item()
             total_count += len(labels)
