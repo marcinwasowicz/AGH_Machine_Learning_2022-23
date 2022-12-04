@@ -32,7 +32,7 @@ if __name__ == "__main__":
     else:
         raise Exception("Unsupported dataset. Allowed: CIFAR10, EMNIST")
 
-    model_save_path = f"{model_save_path_prefix}_ensemble_direct"
+    model_save_path = f"{model_save_path_prefix}ensemble_direct"
     ensemble = BaggingClassifier(
         estimator=ResNet18ScaledClassifier,
         n_estimators=ENSEMBLE_SIZE,
