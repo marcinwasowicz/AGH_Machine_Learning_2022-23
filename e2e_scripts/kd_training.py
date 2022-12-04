@@ -1,6 +1,7 @@
 import sys
 
 import torch
+import torch.nn.functional as F
 from tqdm import tqdm
 
 sys.path.insert(0, ".")
@@ -9,6 +10,12 @@ from utils import *
 
 
 SC_RESNET_KD_LR = 0.0005
+
+
+def kd_kld_loss(student_outputs, teacher_outputs):
+    return torch.nn.KLDivLoss()(
+        F.log_softmax(student_outputs, dim=1), F.softmax(teacher_outputs, dim=1)
+    )
 
 
 def training_loop(
@@ -111,8 +118,9 @@ if __name__ == "__main__":
     optimizer = torch.optim.Adam(
         student.parameters(), lr=SC_RESNET_KD_LR, weight_decay=1e-5
     )
+
     training_loop(
-        torch.nn.MSELoss(),
+        kd_kld_loss,
         optimizer,
         student,
         teacher,
