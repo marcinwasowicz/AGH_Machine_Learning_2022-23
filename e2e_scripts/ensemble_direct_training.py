@@ -8,7 +8,6 @@ from utils import *
 
 
 SC_RESNET_ENSEMBLE_LR = 0.0005
-ENSEMBLE_SIZE = 10
 
 
 if __name__ == "__main__":

@@ -21,6 +21,8 @@ RESNET18_MODEL_SAVE_PATH_SUFFIX = "resnet18.pth"
 
 MODEL_SAVE_PATH_DIR = "./model_binaries/"
 
+ENSEMBLE_SIZE = 10
+
 
 def checkpoint(model, model_save_path):
     model_state_dict = deepcopy(model.cpu().state_dict())
