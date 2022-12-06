@@ -16,7 +16,9 @@ KD_RESNET_ENSEMBLE_LR = 0.0005
 ALPHA = 0.9
 
 
-def training_loop(ensemble, epochs_per_student, train_loader, val_loader, test_loader):
+def training_loop(
+    ensemble, epochs_per_student, save_path, train_loader, val_loader, test_loader
+):
     for estimator_idx, estimator in enumerate(ensemble.estimators_):
         ensemble.train(False)
 
@@ -81,6 +83,7 @@ def training_loop(ensemble, epochs_per_student, train_loader, val_loader, test_l
         test_accuracy = evaluate(best_model, test_loader)
         print(f"Estimator: {estimator_idx + 1}, Test Accuracy: {test_accuracy}")
         ensemble.estimators_[estimator_idx] = best_model
+        io.save(ensemble, save_path)
 
 
 if __name__ == "__main__":
@@ -111,4 +114,7 @@ if __name__ == "__main__":
         cuda=torch.cuda.is_available(),
     )
     io.load(ensemble, ensemble_save_path)
-    training_loop(ensemble, epochs, train_loader, val_loader, test_loader)
+    kd_ensemble_save_path = f"{model_save_path_prefix}ensemble_kd"
+    training_loop(
+        ensemble, epochs, kd_ensemble_save_path, train_loader, val_loader, test_loader
+    )
