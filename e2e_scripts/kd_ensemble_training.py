@@ -13,12 +13,21 @@ from utils import *
 
 
 KD_RESNET_ENSEMBLE_LR = 0.0005
-ALPHA = 0.9
+
+
+class CustomLogger:
+    def __init__(self):
+        pass
+
+    def info(self, message):
+        print(message)
 
 
 def training_loop(
     ensemble, epochs_per_student, save_path, train_loader, val_loader, test_loader
 ):
+    logger = CustomLogger()
+
     for estimator_idx, estimator in enumerate(ensemble.estimators_):
         ensemble.train(False)
 
@@ -83,7 +92,7 @@ def training_loop(
         test_accuracy = evaluate(best_model, test_loader)
         print(f"Estimator: {estimator_idx + 1}, Test Accuracy: {test_accuracy}")
         ensemble.estimators_[estimator_idx] = best_model
-        io.save(ensemble, save_path)
+        io.save(ensemble, save_path, logger)
 
 
 if __name__ == "__main__":
