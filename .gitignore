@@ -133,3 +133,7 @@ Dataset/
 
 # Model binaries 
 *.pth
+model_binaries/
+
+# IDE - related
+.vscode/

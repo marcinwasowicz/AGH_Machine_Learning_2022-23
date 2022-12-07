@@ -1,0 +1,2 @@
+from models.resnet18_scaled import ResNet18ScaledClassifier
+from models.resnet18 import ResNet18Classifier
