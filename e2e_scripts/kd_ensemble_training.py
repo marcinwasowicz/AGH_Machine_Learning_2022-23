@@ -23,8 +23,38 @@ class CustomLogger:
         print(message)
 
 
+def geom_avg_kld_loss(student_output, teacher_outputs):
+    return sum(
+        [
+            nn.KLDivLoss()(
+                F.log_softmax(student_output, dim=1),
+                F.softmax(teacher_output, dim=1),
+            )
+            for teacher_output in teacher_outputs
+        ]
+    ) / len(teacher_outputs)
+
+
+def geom_avg_mse_loss(student_output, teacher_outputs):
+    return sum(
+        [
+            nn.MSELoss()(
+                student_output,
+                teacher_output,
+            )
+            for teacher_output in teacher_outputs
+        ]
+    ) / len(teacher_outputs)
+
+
 def training_loop(
-    ensemble, epochs_per_student, save_path, train_loader, val_loader, test_loader
+    loss_function,
+    ensemble,
+    epochs_per_student,
+    save_path,
+    train_loader,
+    val_loader,
+    test_loader,
 ):
     logger = CustomLogger()
 
@@ -59,18 +89,7 @@ def training_loop(
 
                 optimizer.zero_grad()
                 student_outputs = current_model(inputs)
-                loss = (
-                    sum(
-                        [
-                            nn.KLDivLoss()(
-                                F.log_softmax(student_outputs, dim=1),
-                                F.softmax(teacher_output, dim=1),
-                            )
-                            for teacher_output in teacher_outputs  # add enumerate and if to remove current student from inference
-                        ]
-                    )
-                    / len(teacher_outputs)
-                )
+                loss = loss_function(student_outputs, teacher_outputs)
                 loss.backward()
                 optimizer.step()
 
@@ -125,5 +144,11 @@ if __name__ == "__main__":
     io.load(ensemble, ensemble_save_path)
     kd_ensemble_save_path = f"{model_save_path_prefix}ensemble_kd"
     training_loop(
-        ensemble, epochs, kd_ensemble_save_path, train_loader, val_loader, test_loader
+        geom_avg_mse_loss,
+        ensemble,
+        epochs,
+        kd_ensemble_save_path,
+        train_loader,
+        val_loader,
+        test_loader,
     )
